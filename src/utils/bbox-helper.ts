@@ -71,6 +71,10 @@ export default class BBoxHelper {
     }
   }
 
+  static getCenterOfBBox(bbox: BBox): Position {
+    return { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 }
+  }
+
   static getCenterOfBBoxSide(bbox: BBox, side: Side): Position {
     switch (side) {
       case 'top':

@@ -46,6 +46,9 @@ import EdgeSelectionCanvasExtension from './canvas-extensions/edge-selection-can
 import ExportCanvasExtension from './canvas-extensions/export-canvas-extension'
 import FloatingEdgeCanvasExtension from './canvas-extensions/floating-edge-canvas-extension'
 import EdgeHighlightCanvasExtension from './canvas-extensions/edge-highlight-canvas-extension'
+import EdgeStyleShortcutCanvasExtension from './canvas-extensions/edge-style-shortcut-canvas-extension'
+import NodeFootnoteCanvasExtension from './canvas-extensions/node-footnote-canvas-extension'
+import QuickConnectCanvasExtension from './canvas-extensions/quick-connect-canvas-extension'
 
 // Advanced Styles
 import NodeStylesExtension from './canvas-extensions/advanced-styles/node-styles'
@@ -114,6 +117,9 @@ const CANVAS_EXTENSIONS: typeof CanvasExtension[] = [
   FocusModeCanvasExtension,
   EncapsulateCanvasExtension,
   EdgeSelectionCanvasExtension,
+  EdgeStyleShortcutCanvasExtension,
+  NodeFootnoteCanvasExtension,
+  QuickConnectCanvasExtension,
 ]
 
 export default class AdvancedCanvasPlugin extends Plugin {

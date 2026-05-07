@@ -14,6 +14,11 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
     ))
 
     this.plugin.registerEvent(this.plugin.app.workspace.on(
+      'advanced-canvas:node-added',
+      (canvas: Canvas, node: CanvasNode) => this.onNodeAdded(canvas, node)
+    ))
+
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
       'advanced-canvas:popup-menu-created',
       (canvas: Canvas) => this.onPopupMenuCreated(canvas)
     ))
@@ -120,6 +125,9 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
   private setNodeHeight(node: CanvasNode, height: number) {
     if (height === 0) return
 
+    // Add vertical padding
+    height += 20
+
     // Limit the height to the maximum allowed
     const maxHeight = this.plugin.settings.getSetting('autoResizeNodeMaxHeight')
     if (maxHeight != -1 && height > maxHeight) height = maxHeight
@@ -134,6 +142,24 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
     node.setData({
       ...nodeData,
       height: height
+    })
+  }
+
+  private onNodeAdded(canvas: Canvas, node: CanvasNode) {
+    requestAnimationFrame(() => {
+      const nodeData = node.getData() as any
+      if (!nodeData.dynamicHeight) return
+
+      let contentHeight = 0
+      if (nodeData.type === 'text') {
+        const cmScroller = node.nodeEl.querySelector('.cm-scroller') as HTMLElement | null
+        if (cmScroller) contentHeight = cmScroller.scrollHeight
+      } else if (nodeData.type === 'file') {
+        const renderedView = node.nodeEl.querySelector('.markdown-preview-view.markdown-rendered') as HTMLElement | null
+        if (renderedView) contentHeight = renderedView.clientHeight
+      }
+
+      if (contentHeight > 0) this.setNodeHeight(node, contentHeight)
     })
   }
 }

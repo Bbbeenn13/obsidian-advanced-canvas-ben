@@ -109,6 +109,9 @@ export interface AdvancedCanvasPluginSettingsValues {
 
   edgeSelectionEnabled: boolean
   selectEdgeByDirection: boolean
+
+  edgeStyleShortcutFeatureEnabled: boolean
+  nodeFootnoteFeatureEnabled: boolean
 }
 
 export const DEFAULT_SETTINGS_VALUES: AdvancedCanvasPluginSettingsValues = {
@@ -205,6 +208,9 @@ export const DEFAULT_SETTINGS_VALUES: AdvancedCanvasPluginSettingsValues = {
 
   edgeSelectionEnabled: false,
   selectEdgeByDirection: false,
+
+  edgeStyleShortcutFeatureEnabled: true,
+  nodeFootnoteFeatureEnabled: true,
 }
 
 export const SETTINGS = {
@@ -625,6 +631,16 @@ export const SETTINGS = {
       }
     }
   },
+  edgeStyleShortcutFeatureEnabled: {
+    label: 'Edge style shortcuts',
+    description: 'Enable keyboard shortcuts to quickly change edge styles (e.g. Alt+D for short dashed).',
+    type: 'boolean'
+  } as any,
+  nodeFootnoteFeatureEnabled: {
+    label: 'Node footnotes',
+    description: 'Add footnotes to nodes by double-clicking on borders.',
+    type: 'boolean'
+  } as any,
   focusModeFeatureEnabled: {
     label: 'Focus mode',
     description: 'Focus on a single node and blur all other nodes.',

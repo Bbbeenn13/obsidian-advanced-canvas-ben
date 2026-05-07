@@ -1,0 +1,43 @@
+/* Node footnote styles */
+.canvas-node .ac-node-footnote {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  transform: translateY(calc(100% + 6px));
+  font-size: 0.75em;
+  color: var(--text-muted);
+  background-color: transparent;
+  padding: 2px 8px;
+  pointer-events: none;
+  z-index: 2;
+  text-align: center;
+
+  &.is-editing {
+    pointer-events: auto;
+    cursor: text;
+    outline: none;
+    background-color: transparent;
+    caret-color: var(--color-accent);
+  }
+}
+
+.canvas-node .ac-footnote-border-left,
+.canvas-node .ac-footnote-border-right {
+  position: absolute;
+  bottom: 0;
+  height: var(--border-width, 3px);
+  background-color: var(--border-color);
+  z-index: 1;
+}
+
+.canvas-node .ac-footnote-border-left {
+  left: 0;
+  right: calc(50% + 10px);
+}
+
+.canvas-node .ac-footnote-border-right {
+  right: 0;
+  left: calc(50% + 10px);
+}

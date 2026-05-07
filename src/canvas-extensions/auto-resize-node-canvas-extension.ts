@@ -13,9 +13,34 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
       (canvas: Canvas, node: CanvasNode) => this.onNodeCreated(canvas, node)
     ))
 
+    this.plugin.addCommand({
+      id: 'advanced-canvas:resize-all-nodes',
+      name: 'Resize all auto-resize nodes',
+      hotkeys: [
+        {
+          modifiers: ['Mod', 'Shift'],
+          key: 'r'
+        }
+      ],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (canvas: Canvas) => {
+          return [...canvas.nodes.values()].some(n => (n.getData() as any).dynamicHeight)
+        },
+        (canvas: Canvas) => this.resizeAllNodes(canvas)
+      )
+    })
+
     this.plugin.registerEvent(this.plugin.app.workspace.on(
       'advanced-canvas:node-added',
       (canvas: Canvas, node: CanvasNode) => this.onNodeAdded(canvas, node)
+    ))
+
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
+      'advanced-canvas:canvas-changed',
+      (canvas: Canvas) => {
+        setTimeout(() => this.resizeAllNodes(canvas), 800)
+      }
     ))
 
     this.plugin.registerEvent(this.plugin.app.workspace.on(
@@ -125,14 +150,17 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
   private setNodeHeight(node: CanvasNode, height: number) {
     if (height === 0) return
 
-    // Add vertical padding
-    height += 20
+    // Add vertical padding (split evenly top/bottom by shifting y up)
+    const padding = 30
+    height += padding
+
+    // Skip if height hasn't meaningfully changed
+    const nodeData = node.getData()
+    if (Math.abs(nodeData.height - height) < 3) return
 
     // Limit the height to the maximum allowed
     const maxHeight = this.plugin.settings.getSetting('autoResizeNodeMaxHeight')
     if (maxHeight != -1 && height > maxHeight) height = maxHeight
-
-    const nodeData = node.getData()
 
     height = Math.max(height, node.canvas.config.minContainerDimension)
 
@@ -145,21 +173,80 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
     })
   }
 
+  private resizeAllNodes(canvas: Canvas) {
+    const validNodes = [...canvas.nodes.values()].filter(
+      node => this.isValidNodeType(node.getData())
+    )
+
+    // Measure and resize all in one pass (single setData per node)
+    for (const node of validNodes) {
+      const nodeData = node.getData() as any
+      let contentHeight = 0
+
+      // Try rendered view first (non-editing state)
+      const renderedView = node.nodeEl.querySelector('.markdown-preview-view.markdown-rendered') as HTMLElement | null
+      if (renderedView) {
+        renderedView.style.height = "min-content"
+        contentHeight = renderedView.clientHeight
+        renderedView.style.removeProperty("height")
+      }
+
+      // Fall back to editor scroller (editing state)
+      if (contentHeight === 0) {
+        const cmScroller = node.nodeEl.querySelector('.cm-scroller') as HTMLElement | null
+        if (cmScroller) {
+          cmScroller.style.height = "min-content"
+          contentHeight = cmScroller.scrollHeight
+          cmScroller.style.removeProperty("height")
+        }
+      }
+
+      if (contentHeight > 0) {
+        const padding = 30
+        contentHeight += padding
+
+        // Skip if height hasn't meaningfully changed
+        if (Math.abs(nodeData.height - contentHeight) < 3) continue
+
+        const maxHeight = this.plugin.settings.getSetting('autoResizeNodeMaxHeight')
+        if (maxHeight != -1 && contentHeight > maxHeight) contentHeight = maxHeight
+        contentHeight = Math.max(contentHeight, node.canvas.config.minContainerDimension)
+
+        node.setData({
+          ...nodeData,
+          dynamicHeight: true,
+          height: contentHeight
+        })
+      } else if (!nodeData.dynamicHeight) {
+        node.setData({ ...nodeData, dynamicHeight: true })
+      }
+    }
+  }
+
   private onNodeAdded(canvas: Canvas, node: CanvasNode) {
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const nodeData = node.getData() as any
       if (!nodeData.dynamicHeight) return
 
       let contentHeight = 0
-      if (nodeData.type === 'text') {
+      // Use min-content technique for accurate measurement
+      const renderedView = node.nodeEl.querySelector('.markdown-preview-view.markdown-rendered') as HTMLElement | null
+      if (renderedView) {
+        renderedView.style.height = "min-content"
+        contentHeight = renderedView.clientHeight
+        renderedView.style.removeProperty("height")
+      }
+
+      if (contentHeight === 0) {
         const cmScroller = node.nodeEl.querySelector('.cm-scroller') as HTMLElement | null
-        if (cmScroller) contentHeight = cmScroller.scrollHeight
-      } else if (nodeData.type === 'file') {
-        const renderedView = node.nodeEl.querySelector('.markdown-preview-view.markdown-rendered') as HTMLElement | null
-        if (renderedView) contentHeight = renderedView.clientHeight
+        if (cmScroller) {
+          cmScroller.style.height = "min-content"
+          contentHeight = cmScroller.scrollHeight
+          cmScroller.style.removeProperty("height")
+        }
       }
 
       if (contentHeight > 0) this.setNodeHeight(node, contentHeight)
-    })
+    }, 100)
   }
 }

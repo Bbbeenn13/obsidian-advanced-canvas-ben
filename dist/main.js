@@ -1709,8 +1709,8 @@ var DEFAULT_SETTINGS_VALUES = {
   disableNodePopup: false,
   disableZoom: false,
   disablePan: false,
-  autoResizeNodeFeatureEnabled: false,
-  autoResizeNodeEnabledByDefault: false,
+  autoResizeNodeFeatureEnabled: true,
+  autoResizeNodeEnabledByDefault: true,
   autoResizeNodeMaxHeight: -1,
   autoResizeNodeSnapToGrid: true,
   collapsibleGroupsFeatureEnabled: true,
@@ -1738,7 +1738,9 @@ var DEFAULT_SETTINGS_VALUES = {
   edgeSelectionEnabled: false,
   selectEdgeByDirection: false,
   edgeStyleShortcutFeatureEnabled: true,
-  nodeFootnoteFeatureEnabled: true
+  nodeFootnoteFeatureEnabled: true,
+  autoSpacingFeatureEnabled: true,
+  autoSpacingMinimumGap: 50
 };
 var SETTINGS = {
   general: {
@@ -2179,6 +2181,18 @@ var SETTINGS = {
     label: "Node footnotes",
     description: "Add footnotes to nodes by double-clicking on borders.",
     type: "boolean"
+  },
+  autoSpacingFeatureEnabled: {
+    label: "Auto spacing",
+    description: "Automatically push overlapping nodes apart to maintain a minimum gap.",
+    children: {
+      autoSpacingMinimumGap: {
+        label: "Minimum gap (px)",
+        description: "The minimum gap between any two nodes.",
+        type: "number",
+        parse: (value) => Math.max(1, parseInt(value) || 10)
+      }
+    }
   },
   focusModeFeatureEnabled: {
     label: "Focus mode",
@@ -3900,6 +3914,12 @@ var GroupCanvasExtension = class extends CanvasExtension {
     this.plugin.addCommand({
       id: "create-group-around-selection",
       name: "Group selected nodes",
+      hotkeys: [
+        {
+          modifiers: ["Mod"],
+          key: "g"
+        }
+      ],
       checkCallback: CanvasHelper.canvasCommand(
         this.plugin,
         (canvas) => canvas.selection.size > 0,
@@ -4963,9 +4983,32 @@ var AutoResizeNodeCanvasExtension = class extends CanvasExtension {
       "advanced-canvas:node-created",
       (canvas, node) => this.onNodeCreated(canvas, node)
     ));
+    this.plugin.addCommand({
+      id: "advanced-canvas:resize-all-nodes",
+      name: "Resize all auto-resize nodes",
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "r"
+        }
+      ],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (canvas) => {
+          return [...canvas.nodes.values()].some((n) => n.getData().dynamicHeight);
+        },
+        (canvas) => this.resizeAllNodes(canvas)
+      )
+    });
     this.plugin.registerEvent(this.plugin.app.workspace.on(
       "advanced-canvas:node-added",
       (canvas, node) => this.onNodeAdded(canvas, node)
+    ));
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
+      "advanced-canvas:canvas-changed",
+      (canvas) => {
+        setTimeout(() => this.resizeAllNodes(canvas), 800);
+      }
     ));
     this.plugin.registerEvent(this.plugin.app.workspace.on(
       "advanced-canvas:popup-menu-created",
@@ -5046,10 +5089,12 @@ var AutoResizeNodeCanvasExtension = class extends CanvasExtension {
   }
   setNodeHeight(node, height) {
     if (height === 0) return;
-    height += 20;
+    const padding = 30;
+    height += padding;
+    const nodeData = node.getData();
+    if (Math.abs(nodeData.height - height) < 3) return;
     const maxHeight = this.plugin.settings.getSetting("autoResizeNodeMaxHeight");
     if (maxHeight != -1 && height > maxHeight) height = maxHeight;
-    const nodeData = node.getData();
     height = Math.max(height, node.canvas.config.minContainerDimension);
     if (this.plugin.settings.getSetting("autoResizeNodeSnapToGrid"))
       height = Math.ceil(height / CanvasHelper.GRID_SIZE) * CanvasHelper.GRID_SIZE;
@@ -5058,20 +5103,178 @@ var AutoResizeNodeCanvasExtension = class extends CanvasExtension {
       height
     });
   }
+  resizeAllNodes(canvas) {
+    const validNodes = [...canvas.nodes.values()].filter(
+      (node) => this.isValidNodeType(node.getData())
+    );
+    for (const node of validNodes) {
+      const nodeData = node.getData();
+      let contentHeight = 0;
+      const renderedView = node.nodeEl.querySelector(".markdown-preview-view.markdown-rendered");
+      if (renderedView) {
+        renderedView.style.height = "min-content";
+        contentHeight = renderedView.clientHeight;
+        renderedView.style.removeProperty("height");
+      }
+      if (contentHeight === 0) {
+        const cmScroller = node.nodeEl.querySelector(".cm-scroller");
+        if (cmScroller) {
+          cmScroller.style.height = "min-content";
+          contentHeight = cmScroller.scrollHeight;
+          cmScroller.style.removeProperty("height");
+        }
+      }
+      if (contentHeight > 0) {
+        const padding = 30;
+        contentHeight += padding;
+        if (Math.abs(nodeData.height - contentHeight) < 3) continue;
+        const maxHeight = this.plugin.settings.getSetting("autoResizeNodeMaxHeight");
+        if (maxHeight != -1 && contentHeight > maxHeight) contentHeight = maxHeight;
+        contentHeight = Math.max(contentHeight, node.canvas.config.minContainerDimension);
+        node.setData({
+          ...nodeData,
+          dynamicHeight: true,
+          height: contentHeight
+        });
+      } else if (!nodeData.dynamicHeight) {
+        node.setData({ ...nodeData, dynamicHeight: true });
+      }
+    }
+  }
   onNodeAdded(canvas, node) {
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const nodeData = node.getData();
       if (!nodeData.dynamicHeight) return;
       let contentHeight = 0;
-      if (nodeData.type === "text") {
+      const renderedView = node.nodeEl.querySelector(".markdown-preview-view.markdown-rendered");
+      if (renderedView) {
+        renderedView.style.height = "min-content";
+        contentHeight = renderedView.clientHeight;
+        renderedView.style.removeProperty("height");
+      }
+      if (contentHeight === 0) {
         const cmScroller = node.nodeEl.querySelector(".cm-scroller");
-        if (cmScroller) contentHeight = cmScroller.scrollHeight;
-      } else if (nodeData.type === "file") {
-        const renderedView = node.nodeEl.querySelector(".markdown-preview-view.markdown-rendered");
-        if (renderedView) contentHeight = renderedView.clientHeight;
+        if (cmScroller) {
+          cmScroller.style.height = "min-content";
+          contentHeight = cmScroller.scrollHeight;
+          cmScroller.style.removeProperty("height");
+        }
       }
       if (contentHeight > 0) this.setNodeHeight(node, contentHeight);
+    }, 100);
+  }
+};
+
+// src/canvas-extensions/auto-spacing-canvas-extension.ts
+var MAX_ITERATIONS = 20;
+var AutoSpacingCanvasExtension = class extends CanvasExtension {
+  constructor() {
+    super(...arguments);
+    this.resolving = /* @__PURE__ */ new WeakSet();
+  }
+  isEnabled() {
+    return "autoSpacingFeatureEnabled";
+  }
+  init() {
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
+      "advanced-canvas:canvas-changed",
+      (canvas) => {
+        setTimeout(() => this.resolveSpacing(canvas), 1200);
+      }
+    ));
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
+      "advanced-canvas:node-resized",
+      (canvas) => {
+        requestAnimationFrame(() => this.resolveSpacing(canvas));
+      }
+    ));
+    this.plugin.addCommand({
+      id: "advanced-canvas:resolve-spacing",
+      name: "Resolve node spacing (push overlapping nodes apart)",
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "s"
+        }
+      ],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (canvas) => canvas.nodes.size > 1,
+        (canvas) => this.resolveSpacing(canvas)
+      )
     });
+  }
+  resolveSpacing(canvas) {
+    if (this.resolving.has(canvas)) return;
+    if (canvas.isDragging) return;
+    this.resolving.add(canvas);
+    try {
+      const nodes = [...canvas.nodes.values()].filter((n) => n.getData().type !== "group");
+      const gap = this.plugin.settings.getSetting("autoSpacingMinimumGap");
+      for (let i = 0; i < MAX_ITERATIONS; i++) {
+        if (!this.resolveOneIteration(canvas, nodes, gap)) break;
+      }
+      canvas.pushHistory(canvas.getData());
+    } finally {
+      this.resolving.delete(canvas);
+    }
+  }
+  resolveOneIteration(_canvas, nodes, gap) {
+    const displacements = /* @__PURE__ */ new Map();
+    for (const node of nodes) displacements.set(node.getData().id, { dx: 0, dy: 0 });
+    let hadCollision = false;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const bboxA = BBoxHelper.enlargeBBox(this.nodeToBBox(a), gap / 2);
+        const bboxB = BBoxHelper.enlargeBBox(this.nodeToBBox(b), gap / 2);
+        if (!BBoxHelper.isColliding(bboxA, bboxB)) continue;
+        hadCollision = true;
+        const overlapX = Math.min(bboxA.maxX, bboxB.maxX) - Math.max(bboxA.minX, bboxB.minX);
+        const overlapY = Math.min(bboxA.maxY, bboxB.maxY) - Math.max(bboxA.minY, bboxB.minY);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        const centerA = BBoxHelper.getCenterOfBBox(this.nodeToBBox(a));
+        const centerB = BBoxHelper.getCenterOfBBox(this.nodeToBBox(b));
+        const idA = a.getData().id;
+        const idB = b.getData().id;
+        const dA = displacements.get(idA);
+        const dB = displacements.get(idB);
+        if (overlapX < overlapY) {
+          const sign = centerB.x >= centerA.x ? 1 : -1;
+          const push = overlapX / 2 + 0.5;
+          dA.dx -= push * sign;
+          dB.dx += push * sign;
+        } else {
+          const sign = centerB.y >= centerA.y ? 1 : -1;
+          const push = overlapY / 2 + 0.5;
+          dA.dy -= push * sign;
+          dB.dy += push * sign;
+        }
+      }
+    }
+    if (!hadCollision) return false;
+    for (const node of nodes) {
+      const d = displacements.get(node.getData().id);
+      if (d.dx !== 0 || d.dy !== 0) {
+        const nodeData = node.getData();
+        node.setData({
+          ...nodeData,
+          x: nodeData.x + d.dx,
+          y: nodeData.y + d.dy
+        });
+      }
+    }
+    return true;
+  }
+  nodeToBBox(node) {
+    const data = node.getData();
+    return {
+      minX: data.x,
+      minY: data.y,
+      maxX: data.x + data.width,
+      maxY: data.y + data.height
+    };
   }
 };
 
@@ -7424,14 +7627,15 @@ var QuickConnectCanvasExtension = class extends CanvasExtension {
       "advanced-canvas:selection-changed",
       (canvas, _oldSelection, _updateSelection) => {
         this.syncSelectionOrder(canvas);
+        this.updateSourceHint(canvas);
       }
     ));
     this.plugin.addCommand({
       id: "advanced-canvas:connect-selected-nodes",
-      name: "Connect selected nodes (last selected \u2192 first selected)",
+      name: "Connect selected nodes (last selected \u2192 all others)",
       hotkeys: [
         {
-          modifiers: ["Alt"],
+          modifiers: ["Mod", "Alt"],
           key: "c"
         }
       ],
@@ -7468,40 +7672,56 @@ var QuickConnectCanvasExtension = class extends CanvasExtension {
       new import_obsidian19.Notice("Please select at least 2 cards");
       return;
     }
-    const fromId = nodeIds[nodeIds.length - 1];
-    const toId = nodeIds[0];
-    const fromNode = canvas.nodes.get(fromId);
-    const toNode = canvas.nodes.get(toId);
-    const existingEdge = Array.from(canvas.edges.values()).find(
-      (e) => e.getData().fromNode === fromId && e.getData().toNode === toId
-    );
-    if (existingEdge) {
-      new import_obsidian19.Notice("Edge already exists");
+    const sourceId = nodeIds[nodeIds.length - 1];
+    const sourceNode = canvas.nodes.get(sourceId);
+    const targetIds = nodeIds.slice(0, -1);
+    const existingEdges = Array.from(canvas.edges.values());
+    const newEdges = [];
+    let skipped = 0;
+    for (const targetId of targetIds) {
+      const isDuplicate = existingEdges.some(
+        (e) => e.getData().fromNode === sourceId && e.getData().toNode === targetId
+      ) || newEdges.some((e) => e.toNode === targetId);
+      if (isDuplicate) {
+        skipped++;
+        continue;
+      }
+      const targetNode = canvas.nodes.get(targetId);
+      const sourceCenter = BBoxHelper.getCenterOfBBox(sourceNode.getBBox());
+      const targetCenter = BBoxHelper.getCenterOfBBox(targetNode.getBBox());
+      newEdges.push({
+        id: this.generateId(),
+        fromNode: sourceId,
+        fromSide: CanvasHelper.getBestSideForFloatingEdge(targetCenter, sourceNode),
+        fromFloating: true,
+        toNode: targetId,
+        toSide: CanvasHelper.getBestSideForFloatingEdge(sourceCenter, targetNode),
+        toFloating: true
+      });
+    }
+    if (newEdges.length === 0) {
+      new import_obsidian19.Notice("All edges already exist");
       return;
     }
-    const fromCenter = BBoxHelper.getCenterOfBBox(fromNode.getBBox());
-    const toCenter = BBoxHelper.getCenterOfBBox(toNode.getBBox());
-    const fromSide = CanvasHelper.getBestSideForFloatingEdge(toCenter, fromNode);
-    const toSide = CanvasHelper.getBestSideForFloatingEdge(fromCenter, toNode);
-    const edgeId = this.generateId();
-    const edge = {
-      id: edgeId,
-      fromNode: fromId,
-      fromSide,
-      fromFloating: true,
-      toNode: toId,
-      toSide,
-      toFloating: true
-    };
-    canvas.importData({ nodes: [], edges: [edge] }, false, false);
+    canvas.importData({ nodes: [], edges: newEdges }, false, false);
     canvas.pushHistory(canvas.getData());
-    new import_obsidian19.Notice("Edge created");
+    const msg = skipped > 0 ? `${newEdges.length} edge(s) created, ${skipped} skipped (already exist)` : `${newEdges.length} edge(s) created`;
+    new import_obsidian19.Notice(msg);
   }
   generateId() {
     const chars = "0123456789abcdef";
     let id = "";
     for (let i = 0; i < 16; i++) id += chars[Math.floor(Math.random() * 16)];
     return id;
+  }
+  updateSourceHint(canvas) {
+    canvas.wrapperEl.querySelectorAll(".ac-quick-connect-source").forEach((el) => {
+      el.classList.remove("ac-quick-connect-source");
+    });
+    if (this.selectionOrder.length < 2) return;
+    const sourceId = this.selectionOrder[this.selectionOrder.length - 1];
+    const sourceNode = canvas.nodes.get(sourceId);
+    if (sourceNode) sourceNode.nodeEl.classList.add("ac-quick-connect-source");
   }
 };
 
@@ -7772,6 +7992,7 @@ var CANVAS_EXTENSIONS = [
   NodeRatioCanvasExtension,
   FloatingEdgeCanvasExtension,
   AutoResizeNodeCanvasExtension,
+  AutoSpacingCanvasExtension,
   CollapsibleGroupsCanvasExtension,
   ColorPaletteCanvasExtension,
   PresentationCanvasExtension,

@@ -16,16 +16,17 @@ export default class QuickConnectCanvasExtension extends CanvasExtension {
       'advanced-canvas:selection-changed',
       (canvas: Canvas, _oldSelection: Set<CanvasElement>, _updateSelection: (fn: () => void) => void) => {
         this.syncSelectionOrder(canvas)
+        this.updateSourceHint(canvas)
       }
     ))
 
     // Register as a command — user can bind any hotkey via Obsidian Settings > Hotkeys
     this.plugin.addCommand({
       id: 'advanced-canvas:connect-selected-nodes',
-      name: 'Connect selected nodes (last selected → first selected)',
+      name: 'Connect selected nodes (last selected → all others)',
       hotkeys: [
         {
-          modifiers: ['Alt'],
+          modifiers: ['Mod', 'Alt'],
           key: 'c'
         }
       ],
@@ -70,44 +71,48 @@ export default class QuickConnectCanvasExtension extends CanvasExtension {
       return
     }
 
-    const fromId = nodeIds[nodeIds.length - 1] // Last selected = source
-    const toId = nodeIds[0] // First selected = target
+    const sourceId = nodeIds[nodeIds.length - 1] // Last selected = source
+    const sourceNode = canvas.nodes.get(sourceId)!
+    const targetIds = nodeIds.slice(0, -1) // All others = targets
 
-    const fromNode = canvas.nodes.get(fromId)!
-    const toNode = canvas.nodes.get(toId)!
+    const existingEdges = Array.from(canvas.edges.values())
+    const newEdges: CanvasEdgeData[] = []
+    let skipped = 0
 
-    // Check duplicate
-    const existingEdge = Array.from(canvas.edges.values()).find(
-      e => e.getData().fromNode === fromId && e.getData().toNode === toId
-    )
-    if (existingEdge) {
-      new Notice('Edge already exists')
+    for (const targetId of targetIds) {
+      const isDuplicate = existingEdges.some(
+        e => e.getData().fromNode === sourceId && e.getData().toNode === targetId
+      ) || newEdges.some(e => e.toNode === targetId)
+      if (isDuplicate) { skipped++; continue }
+
+      const targetNode = canvas.nodes.get(targetId)!
+
+      const sourceCenter = BBoxHelper.getCenterOfBBox(sourceNode.getBBox())
+      const targetCenter = BBoxHelper.getCenterOfBBox(targetNode.getBBox())
+
+      newEdges.push({
+        id: this.generateId(),
+        fromNode: sourceId,
+        fromSide: CanvasHelper.getBestSideForFloatingEdge(targetCenter, sourceNode),
+        fromFloating: true,
+        toNode: targetId,
+        toSide: CanvasHelper.getBestSideForFloatingEdge(sourceCenter, targetNode),
+        toFloating: true,
+      })
+    }
+
+    if (newEdges.length === 0) {
+      new Notice('All edges already exist')
       return
     }
 
-    // Calculate optimal sides
-    const fromCenter = BBoxHelper.getCenterOfBBox(fromNode.getBBox())
-    const toCenter = BBoxHelper.getCenterOfBBox(toNode.getBBox())
-
-    const fromSide = CanvasHelper.getBestSideForFloatingEdge(toCenter, fromNode)
-    const toSide = CanvasHelper.getBestSideForFloatingEdge(fromCenter, toNode)
-
-    const edgeId = this.generateId()
-    const edge: CanvasEdgeData = {
-      id: edgeId,
-      fromNode: fromId,
-      fromSide,
-      fromFloating: true,
-      toNode: toId,
-      toSide,
-      toFloating: true,
-    }
-
-    // Add edge using importData (same pattern as auto-file-node-edges)
-    canvas.importData({ nodes: [], edges: [edge] }, false, false)
+    canvas.importData({ nodes: [], edges: newEdges }, false, false)
     canvas.pushHistory(canvas.getData())
 
-    new Notice('Edge created')
+    const msg = skipped > 0
+      ? `${newEdges.length} edge(s) created, ${skipped} skipped (already exist)`
+      : `${newEdges.length} edge(s) created`
+    new Notice(msg)
   }
 
   private generateId(): string {
@@ -115,5 +120,18 @@ export default class QuickConnectCanvasExtension extends CanvasExtension {
     let id = ''
     for (let i = 0; i < 16; i++) id += chars[Math.floor(Math.random() * 16)]
     return id
+  }
+
+  private updateSourceHint(canvas: Canvas) {
+    // Remove existing hints
+    canvas.wrapperEl.querySelectorAll('.ac-quick-connect-source').forEach(el => {
+      el.classList.remove('ac-quick-connect-source')
+    })
+
+    // Add hint to last selected node when 2+ nodes are selected
+    if (this.selectionOrder.length < 2) return
+    const sourceId = this.selectionOrder[this.selectionOrder.length - 1]
+    const sourceNode = canvas.nodes.get(sourceId)
+    if (sourceNode) sourceNode.nodeEl.classList.add('ac-quick-connect-source')
   }
 }

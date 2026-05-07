@@ -34,6 +34,7 @@ import BetterReadonlyCanvasExtension from './canvas-extensions/better-readonly-c
 import EncapsulateCanvasExtension from './canvas-extensions/encapsulate-canvas-extension'
 import CommandsCanvasExtension from './canvas-extensions/commands-canvas-extension'
 import AutoResizeNodeCanvasExtension from './canvas-extensions/auto-resize-node-canvas-extension'
+import AutoSpacingCanvasExtension from './canvas-extensions/auto-spacing-canvas-extension'
 import PortalsCanvasExtension from './canvas-extensions/portals-canvas-extension'
 import FrontmatterControlButtonCanvasExtension from './canvas-extensions/frontmatter-control-button-canvas-extension'
 import BetterDefaultSettingsCanvasExtension from './canvas-extensions/better-default-settings-canvas-extension'
@@ -91,6 +92,7 @@ const CANVAS_EXTENSIONS: typeof CanvasExtension[] = [
   NodeRatioCanvasExtension,
   FloatingEdgeCanvasExtension,
   AutoResizeNodeCanvasExtension,
+  AutoSpacingCanvasExtension,
   CollapsibleGroupsCanvasExtension,
   ColorPaletteCanvasExtension,
   PresentationCanvasExtension,

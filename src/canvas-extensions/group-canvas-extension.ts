@@ -13,6 +13,12 @@ export default class GroupCanvasExtension extends CanvasExtension {
     this.plugin.addCommand({
       id: 'create-group-around-selection',
       name: 'Group selected nodes',
+      hotkeys: [
+        {
+          modifiers: ['Mod'],
+          key: 'g'
+        }
+      ],
       checkCallback: CanvasHelper.canvasCommand(
         this.plugin,
         (canvas: Canvas) => canvas.selection.size > 0,

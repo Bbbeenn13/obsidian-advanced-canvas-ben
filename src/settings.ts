@@ -112,6 +112,9 @@ export interface AdvancedCanvasPluginSettingsValues {
 
   edgeStyleShortcutFeatureEnabled: boolean
   nodeFootnoteFeatureEnabled: boolean
+
+  autoSpacingFeatureEnabled: boolean
+  autoSpacingMinimumGap: number
 }
 
 export const DEFAULT_SETTINGS_VALUES: AdvancedCanvasPluginSettingsValues = {
@@ -172,8 +175,8 @@ export const DEFAULT_SETTINGS_VALUES: AdvancedCanvasPluginSettingsValues = {
   disableZoom: false,
   disablePan: false,
 
-  autoResizeNodeFeatureEnabled: false,
-  autoResizeNodeEnabledByDefault: false,
+  autoResizeNodeFeatureEnabled: true,
+  autoResizeNodeEnabledByDefault: true,
   autoResizeNodeMaxHeight: -1,
   autoResizeNodeSnapToGrid: true,
 
@@ -211,6 +214,9 @@ export const DEFAULT_SETTINGS_VALUES: AdvancedCanvasPluginSettingsValues = {
 
   edgeStyleShortcutFeatureEnabled: true,
   nodeFootnoteFeatureEnabled: true,
+
+  autoSpacingFeatureEnabled: true,
+  autoSpacingMinimumGap: 50,
 }
 
 export const SETTINGS = {
@@ -640,6 +646,18 @@ export const SETTINGS = {
     label: 'Node footnotes',
     description: 'Add footnotes to nodes by double-clicking on borders.',
     type: 'boolean'
+  } as any,
+  autoSpacingFeatureEnabled: {
+    label: 'Auto spacing',
+    description: 'Automatically push overlapping nodes apart to maintain a minimum gap.',
+    children: {
+      autoSpacingMinimumGap: {
+        label: 'Minimum gap (px)',
+        description: 'The minimum gap between any two nodes.',
+        type: 'number',
+        parse: (value: string) => Math.max(1, parseInt(value) || 10)
+      } as any
+    }
   } as any,
   focusModeFeatureEnabled: {
     label: 'Focus mode',

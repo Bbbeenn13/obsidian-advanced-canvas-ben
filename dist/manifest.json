@@ -3,9 +3,8 @@
   "name": "Advanced Canvas_ben",
   "version": "6.0.1-ben",
   "minAppVersion": "1.1.0",
-  "description": "Supercharge your canvas experience! Create presentations, flowcharts and more!",
-  "author": "Developer-Mike",
-  "authorUrl": "https://github.com/Developer-Mike",
-  "fundingUrl": "https://ko-fi.com/X8X27IA08",
+  "description": "Personal fork of Advanced Canvas with custom enhancements (edge style shortcuts, node footnotes, quick connect)",
+  "author": "Ben (based on Developer-Mike's Advanced Canvas)",
+  "authorUrl": "https://github.com/Bbbeenn13",
   "isDesktopOnly": false
 }

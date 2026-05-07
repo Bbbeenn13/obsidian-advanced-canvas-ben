@@ -345,10 +345,17 @@ details.setting-item > *:not(summary) {
   stroke-dasharray: calc(3px * var(--zoom-multiplier));
 }
 .canvas-edges path[data-path=short-dashed] {
-  stroke-dasharray: 9px;
+  stroke-dasharray: 8 4;
+  animation: edge-march 0.8s linear infinite;
 }
 .canvas-edges path[data-path=long-dashed] {
-  stroke-dasharray: 18px;
+  stroke-dasharray: 16 8;
+  animation: edge-march 1.2s linear infinite;
+}
+@keyframes edge-march {
+  to {
+    stroke-dashoffset: -24;
+  }
 }
 .canvas-edges [data-arrow=triangle-outline] polygon,
 .canvas-edges [data-arrow=diamond-outline] polygon,
@@ -543,46 +550,6 @@ details.setting-item > *:not(summary) {
 .canvas-node .ac-footnote-border-right {
   right: 0;
   left: calc(50% + 10px);
-}
-.canvas-node.ac-quick-connect-source::after {
-  content: "";
-  position: absolute;
-  inset: -13px;
-  border-radius: 8px;
-  pointer-events: none;
-  --c: rgba(100, 200, 120, 0.8);
-  border: 2px solid transparent;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      var(--c) 0 5px,
-      transparent 5px 10px) 0 0/100% 2px no-repeat,
-    repeating-linear-gradient(
-      0deg,
-      var(--c) 0 5px,
-      transparent 5px 10px) 100% 0/2px 100% no-repeat,
-    repeating-linear-gradient(
-      90deg,
-      var(--c) 0 5px,
-      transparent 5px 10px) 0 100%/100% 2px no-repeat,
-    repeating-linear-gradient(
-      0deg,
-      var(--c) 0 5px,
-      transparent 5px 10px) 0 0/2px 100% no-repeat;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  padding: 2px;
-  animation: marching-ants 0.4s linear infinite;
-}
-@keyframes marching-ants {
-  to {
-    background-position:
-      10px 0,
-      100% 10px,
-      -10px 100%,
-      0 -10px;
-  }
 }
 .canvas-node .canvas-node-container {
   text-align: center;

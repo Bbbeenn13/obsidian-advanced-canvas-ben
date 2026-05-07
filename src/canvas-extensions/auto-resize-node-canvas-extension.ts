@@ -223,30 +223,11 @@ export default class AutoResizeNodeCanvasExtension  extends CanvasExtension {
     }
   }
 
-  private onNodeAdded(canvas: Canvas, node: CanvasNode) {
-    setTimeout(() => {
-      const nodeData = node.getData() as any
-      if (!nodeData.dynamicHeight) return
-
-      let contentHeight = 0
-      // Use min-content technique for accurate measurement
-      const renderedView = node.nodeEl.querySelector('.markdown-preview-view.markdown-rendered') as HTMLElement | null
-      if (renderedView) {
-        renderedView.style.height = "min-content"
-        contentHeight = renderedView.clientHeight
-        renderedView.style.removeProperty("height")
-      }
-
-      if (contentHeight === 0) {
-        const cmScroller = node.nodeEl.querySelector('.cm-scroller') as HTMLElement | null
-        if (cmScroller) {
-          cmScroller.style.height = "min-content"
-          contentHeight = cmScroller.scrollHeight
-          cmScroller.style.removeProperty("height")
-        }
-      }
-
-      if (contentHeight > 0) this.setNodeHeight(node, contentHeight)
-    }, 100)
+  private onNodeAdded(_canvas: Canvas, node: CanvasNode) {
+    // Only mark dynamicHeight; actual resizing is handled by resizeAllNodes
+    const nodeData = node.getData() as any
+    if (!nodeData.dynamicHeight && this.isValidNodeType(nodeData)) {
+      node.setData({ ...nodeData, dynamicHeight: true })
+    }
   }
 }

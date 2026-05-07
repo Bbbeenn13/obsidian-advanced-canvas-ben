@@ -124,14 +124,48 @@ export default class QuickConnectCanvasExtension extends CanvasExtension {
 
   private updateSourceHint(canvas: Canvas) {
     // Remove existing hints
-    canvas.wrapperEl.querySelectorAll('.ac-quick-connect-source').forEach(el => {
-      el.classList.remove('ac-quick-connect-source')
-    })
+    canvas.wrapperEl.querySelectorAll('.ac-marching-ants').forEach(el => el.remove())
 
     // Add hint to last selected node when 2+ nodes are selected
     if (this.selectionOrder.length < 2) return
     const sourceId = this.selectionOrder[this.selectionOrder.length - 1]
     const sourceNode = canvas.nodes.get(sourceId)
-    if (sourceNode) sourceNode.nodeEl.classList.add('ac-quick-connect-source')
+    if (!sourceNode) return
+
+    const nodeData = sourceNode.getData()
+    const padding = 13
+    const w = nodeData.width + padding * 2
+    const h = nodeData.height + padding * 2
+    const r = 12
+
+    const ns = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(ns, 'svg')
+    svg.classList.add('ac-marching-ants')
+    svg.setAttribute('width', String(w))
+    svg.setAttribute('height', String(h))
+    svg.style.cssText = `position:absolute;top:-${padding}px;left:-${padding}px;width:${w}px;height:${h}px;pointer-events:none;z-index:10;`
+
+    const rect = document.createElementNS(ns, 'rect')
+    rect.setAttribute('x', '1')
+    rect.setAttribute('y', '1')
+    rect.setAttribute('width', String(w - 2))
+    rect.setAttribute('height', String(h - 2))
+    rect.setAttribute('rx', String(r))
+    rect.setAttribute('ry', String(r))
+    rect.setAttribute('fill', 'none')
+    rect.setAttribute('stroke', 'rgba(100, 200, 120, 0.8)')
+    rect.setAttribute('stroke-width', '2')
+    rect.setAttribute('stroke-dasharray', '8 4')
+
+    const animate = document.createElementNS(ns, 'animate')
+    animate.setAttribute('attributeName', 'stroke-dashoffset')
+    animate.setAttribute('from', '0')
+    animate.setAttribute('to', '-24')
+    animate.setAttribute('dur', '0.6s')
+    animate.setAttribute('repeatCount', 'indefinite')
+
+    rect.appendChild(animate)
+    svg.appendChild(rect)
+    sourceNode.nodeEl.appendChild(svg)
   }
 }

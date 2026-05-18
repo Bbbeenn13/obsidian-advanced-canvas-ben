@@ -130,6 +130,17 @@ export default class CommandsCanvasExtension extends CanvasExtension {
     })
 
     this.plugin.addCommand({
+      id: 'justify-selection-horizontally',
+      name: 'Justify selection horizontally',
+      hotkeys: [{ modifiers: ['Alt'], key: 'ArrowUp' }],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (canvas: Canvas) => !canvas.readonly && canvas.getSelectionData().nodes.length >= 2,
+        (canvas: Canvas) => this.justifySelection(canvas, true)
+      )
+    })
+
+    this.plugin.addCommand({
       id: 'select-connected-edges',
       name: 'Select connected edges',
       checkCallback: CanvasHelper.canvasCommand(
@@ -381,6 +392,27 @@ export default class CommandsCanvasExtension extends CanvasExtension {
       width: node.width + expand.x * expandNodeStepSize,
       height: node.height + expand.y * expandNodeStepSize
     })
+  }
+
+  private justifySelection(canvas: Canvas, horizontally: boolean) {
+    const selectionData = canvas.getSelectionData()
+    if (selectionData.nodes.length < 2) return
+
+    const nodes = selectionData.nodes
+      .map(nodeData => ({ data: nodeData, node: canvas.nodes.get(nodeData.id) }))
+      .filter(n => n.node !== undefined)
+
+    if (nodes.length < 2) return
+
+    const centerY = selectionData.center.y
+    for (const n of nodes) {
+      n.node!.setData({
+        ...n.data,
+        y: centerY - n.data.height / 2
+      })
+    }
+
+    canvas.pushHistory(canvas.getData())
   }
 
   private flipSelection(canvas: Canvas, horizontally: boolean) {

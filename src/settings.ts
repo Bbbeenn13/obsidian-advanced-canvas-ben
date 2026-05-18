@@ -742,7 +742,7 @@ export class AdvancedCanvasPluginSettingTab extends PluginSettingTab {
       settingsHeaderChildrenContainerEl.appendChild(document.createElement('span')) // Add empty span to not trigger the :first-child selector in the CSS
       containerEl.appendChild(settingsHeaderChildrenContainerEl)
 
-      for (const [settingId, setting] of Object.entries(heading.children) as [keyof AdvancedCanvasPluginSettingsValues, Setting][]) {
+      for (const [settingId, setting] of Object.entries(heading.children ?? {}) as [keyof AdvancedCanvasPluginSettingsValues, Setting][]) {
         if (!(settingId in DEFAULT_SETTINGS_VALUES)) continue
 
         switch (setting.type) {

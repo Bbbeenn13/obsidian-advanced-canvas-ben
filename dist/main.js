@@ -2233,6 +2233,7 @@ var AdvancedCanvasPluginSettingTab = class extends import_obsidian4.PluginSettin
     this.settingsManager = settingsManager;
   }
   display() {
+    var _a;
     const { containerEl } = this;
     containerEl.empty();
     this.createKofiBanner(containerEl);
@@ -2248,7 +2249,7 @@ var AdvancedCanvasPluginSettingTab = class extends import_obsidian4.PluginSettin
       settingsHeaderChildrenContainerEl.classList.add("settings-header-children");
       settingsHeaderChildrenContainerEl.appendChild(document.createElement("span"));
       containerEl.appendChild(settingsHeaderChildrenContainerEl);
-      for (const [settingId, setting] of Object.entries(heading.children)) {
+      for (const [settingId, setting] of Object.entries((_a = heading.children) != null ? _a : {})) {
         if (!(settingId in DEFAULT_SETTINGS_VALUES)) continue;
         switch (setting.type) {
           case "text":
@@ -4666,6 +4667,16 @@ var CommandsCanvasExtension = class extends CanvasExtension {
       )
     });
     this.plugin.addCommand({
+      id: "justify-selection-horizontally",
+      name: "Justify selection horizontally",
+      hotkeys: [{ modifiers: ["Alt"], key: "ArrowUp" }],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (canvas) => !canvas.readonly && canvas.getSelectionData().nodes.length >= 2,
+        (canvas) => this.justifySelection(canvas, true)
+      )
+    });
+    this.plugin.addCommand({
       id: "select-connected-edges",
       name: "Select connected edges",
       checkCallback: CanvasHelper.canvasCommand(
@@ -4868,6 +4879,20 @@ var CommandsCanvasExtension = class extends CanvasExtension {
       width: node.width + expand.x * expandNodeStepSize,
       height: node.height + expand.y * expandNodeStepSize
     });
+  }
+  justifySelection(canvas, horizontally) {
+    const selectionData = canvas.getSelectionData();
+    if (selectionData.nodes.length < 2) return;
+    const nodes = selectionData.nodes.map((nodeData) => ({ data: nodeData, node: canvas.nodes.get(nodeData.id) })).filter((n) => n.node !== void 0);
+    if (nodes.length < 2) return;
+    const centerY = selectionData.center.y;
+    for (const n of nodes) {
+      n.node.setData({
+        ...n.data,
+        y: centerY - n.data.height / 2
+      });
+    }
+    canvas.pushHistory(canvas.getData());
   }
   flipSelection(canvas, horizontally) {
     const selectionData = canvas.getSelectionData();
@@ -7738,6 +7763,197 @@ var QuickConnectCanvasExtension = class extends CanvasExtension {
   }
 };
 
+// src/canvas-extensions/edge-box-selection-canvas-extension.ts
+var SAMPLE_STEPS = 20;
+var EdgeBoxSelectionCanvasExtension = class extends CanvasExtension {
+  constructor() {
+    super(...arguments);
+    this.dragStart = null;
+    this.altHeld = false;
+  }
+  isEnabled() {
+    return true;
+  }
+  init() {
+    this.plugin.registerEvent(this.plugin.app.workspace.on(
+      "advanced-canvas:canvas-changed",
+      (canvas) => this.setupListeners(canvas)
+    ));
+  }
+  setupListeners(canvas) {
+    const wrapperEl = canvas.wrapperEl;
+    if (!wrapperEl) return;
+    wrapperEl.addEventListener("pointerdown", (e) => {
+      const target = e.target;
+      if (target.closest(".canvas-node") || target.closest(".canvas-edge")) return;
+      this.altHeld = e.altKey;
+      this.dragStart = canvas.posFromClient({ x: e.clientX, y: e.clientY });
+    });
+    wrapperEl.addEventListener("pointerup", (e) => {
+      if (!this.dragStart) return;
+      const end = canvas.posFromClient({ x: e.clientX, y: e.clientY });
+      const start = this.dragStart;
+      const wasAltHeld = this.altHeld;
+      this.dragStart = null;
+      this.altHeld = false;
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+      if (dx < 5 && dy < 5) return;
+      if (!wasAltHeld) return;
+      const selectionBBox = {
+        minX: Math.min(start.x, end.x),
+        minY: Math.min(start.y, end.y),
+        maxX: Math.max(start.x, end.x),
+        maxY: Math.max(start.y, end.y)
+      };
+      this.selectEdgesInBBox(canvas, selectionBBox);
+    });
+  }
+  selectEdgesInBBox(canvas, bbox) {
+    const edgesToAdd = [];
+    for (const edge of canvas.edges.values()) {
+      if (this.edgeIntersectsBBox(edge, bbox)) {
+        edgesToAdd.push(edge);
+      }
+    }
+    if (edgesToAdd.length === 0) return;
+    canvas.updateSelection(() => {
+      for (const edge of edgesToAdd) {
+        canvas.selection.add(edge);
+      }
+    });
+  }
+  edgeIntersectsBBox(edge, bbox) {
+    const b = edge.bezier;
+    if (!b) return false;
+    const p0 = b.from;
+    const p1 = b.cp1;
+    const p2 = b.cp2;
+    const p3 = b.to;
+    for (let i = 0; i <= SAMPLE_STEPS; i++) {
+      const t = i / SAMPLE_STEPS;
+      const pt = this.sampleCubicBezier(p0, p1, p2, p3, t);
+      if (BBoxHelper.insideBBox(pt, bbox, true)) return true;
+    }
+    return false;
+  }
+  sampleCubicBezier(p0, p1, p2, p3, t) {
+    const u = 1 - t;
+    const uu = u * u;
+    const uuu = uu * u;
+    const tt = t * t;
+    const ttt = tt * t;
+    return {
+      x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+      y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+    };
+  }
+};
+
+// src/canvas-extensions/text-highlight-canvas-extension.ts
+var import_view2 = require("@codemirror/view");
+var import_view3 = require("@codemirror/view");
+var HiddenMark = class extends import_view3.WidgetType {
+  toDOM() {
+    const span = document.createElement("span");
+    span.style.display = "none";
+    return span;
+  }
+  ignoreEvent() {
+    return true;
+  }
+};
+var highlightPlugin = import_view2.ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.decorations = buildDecorations(view);
+  }
+  update(update) {
+    if (update.docChanged || update.viewportChanged) {
+      this.decorations = buildDecorations(update.view);
+    }
+  }
+}, { decorations: (v) => v.decorations });
+function buildDecorations(view) {
+  const decorations = [];
+  const doc = view.state.doc;
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const text = line.text;
+    let searchFrom = 0;
+    while (searchFrom < text.length) {
+      const openIdx = text.indexOf("==", searchFrom);
+      if (openIdx === -1) break;
+      const contentStart = openIdx + 2;
+      const closeIdx = text.indexOf("==", contentStart);
+      if (closeIdx === -1) break;
+      if (closeIdx === contentStart) {
+        searchFrom = closeIdx + 2;
+        continue;
+      }
+      const lineStart = line.from;
+      decorations.push(
+        import_view2.Decoration.replace({
+          widget: new HiddenMark()
+        }).range(lineStart + openIdx, lineStart + contentStart)
+      );
+      decorations.push(
+        import_view2.Decoration.mark({ class: "ac-highlight" }).range(lineStart + contentStart, lineStart + closeIdx)
+      );
+      decorations.push(
+        import_view2.Decoration.replace({
+          widget: new HiddenMark()
+        }).range(lineStart + closeIdx, lineStart + closeIdx + 2)
+      );
+      searchFrom = closeIdx + 2;
+    }
+  }
+  return import_view2.Decoration.set(decorations, true);
+}
+var TextHighlightCanvasExtension = class extends CanvasExtension {
+  isEnabled() {
+    return true;
+  }
+  init() {
+    this.plugin.registerEditorExtension([highlightPlugin]);
+    this.plugin.addCommand({
+      id: "advanced-canvas:toggle-text-highlight",
+      name: "Toggle text highlight",
+      hotkeys: [{ modifiers: ["Alt"], key: "h" }],
+      checkCallback: CanvasHelper.canvasCommand(
+        this.plugin,
+        (_canvas) => true,
+        (_canvas) => this.toggleHighlight()
+      )
+    });
+  }
+  toggleHighlight() {
+    const canvas = this.plugin.getCurrentCanvas();
+    if (!canvas) return;
+    const node = Array.from(canvas.nodes.values()).find((n) => n.isEditing);
+    if (!node) return;
+    const cm = node.child.editMode.cm;
+    const sel = cm.state.selection.main;
+    if (!sel || sel.from === sel.to) return;
+    const from = sel.from;
+    const to = sel.to;
+    const selectedText = cm.state.sliceDoc(from, to);
+    const beforeText = cm.state.sliceDoc(Math.max(0, from - 2), from);
+    const afterText = cm.state.sliceDoc(to, Math.min(cm.state.doc.length, to + 2));
+    if (beforeText === "==" && afterText === "==") {
+      cm.dispatch({
+        changes: [
+          { from: from - 2, to: from, insert: "" },
+          { from: to, to: to + 2, insert: "" }
+        ]
+      });
+    } else {
+      cm.dispatch({
+        changes: { from, to, insert: `==${selectedText}==` }
+      });
+    }
+  }
+};
+
 // src/canvas-extensions/dataset-exposers/canvas-metadata-exposer.ts
 var CanvasMetadataExposerExtension = class extends CanvasExtension {
   isEnabled() {
@@ -8032,7 +8248,9 @@ var CANVAS_EXTENSIONS = [
   EdgeSelectionCanvasExtension,
   EdgeStyleShortcutCanvasExtension,
   NodeFootnoteCanvasExtension,
-  QuickConnectCanvasExtension
+  QuickConnectCanvasExtension,
+  EdgeBoxSelectionCanvasExtension,
+  TextHighlightCanvasExtension
 ];
 var AdvancedCanvasPlugin = class extends import_obsidian20.Plugin {
   async onload() {

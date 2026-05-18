@@ -50,6 +50,8 @@ import EdgeHighlightCanvasExtension from './canvas-extensions/edge-highlight-can
 import EdgeStyleShortcutCanvasExtension from './canvas-extensions/edge-style-shortcut-canvas-extension'
 import NodeFootnoteCanvasExtension from './canvas-extensions/node-footnote-canvas-extension'
 import QuickConnectCanvasExtension from './canvas-extensions/quick-connect-canvas-extension'
+import EdgeBoxSelectionCanvasExtension from './canvas-extensions/edge-box-selection-canvas-extension'
+import TextHighlightCanvasExtension from './canvas-extensions/text-highlight-canvas-extension'
 
 // Advanced Styles
 import NodeStylesExtension from './canvas-extensions/advanced-styles/node-styles'
@@ -122,6 +124,8 @@ const CANVAS_EXTENSIONS: typeof CanvasExtension[] = [
   EdgeStyleShortcutCanvasExtension,
   NodeFootnoteCanvasExtension,
   QuickConnectCanvasExtension,
+  EdgeBoxSelectionCanvasExtension,
+  TextHighlightCanvasExtension,
 ]
 
 export default class AdvancedCanvasPlugin extends Plugin {
